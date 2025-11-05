@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <link href="https://cdn.jsdelivr.net/npm/flowbite@3.1.2/dist/flowbite.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@4.7.0/fonts/remixicon.css" rel="stylesheet" />
+  <title>File Upload Popup</title>
+</head>
+
+<body class="bg-gray-100 dark:bg-gray-900 min-h-screen flex ">
+
+  <main class="p-6">
+    <button onclick="showPop()"
+      class="bg-blue-600 hover:bg-blue-700 transition-all text-white font-semibold py-2.5 px-6 rounded-lg shadow-lg">
+      Upload File
+    </button>
+
+    <!-- POPUP -->
+    <div
+      class="pop hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center transition-all duration-300 ease-in-out">
+
+      <div
+        class="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 w-[90%] sm:w-[420px] transition-all duration-300 ease-in-out">
+
+        <!-- Close Button -->
+        <button
+          class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 text-2xl transition-all"
+          onclick="hidePop()">
+          <i class="ri-close-line"></i>
+        </button>
+
+        <form id="uploadForm" enctype="multipart/form-data" class="space-y-6">
+          <!-- Dropzone -->
+          <label for="dropzone-file"
+            class="flex flex-col items-center justify-center w-full h-56 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-all">
+            <div class="flex flex-col items-center justify-center pt-5 pb-6 text-center">
+              <svg class="w-10 h-10 mb-3 text-gray-500 dark:text-gray-300" aria-hidden="true"
+                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
+              </svg>
+              <p class="mb-1 text-sm text-gray-500 dark:text-gray-300">
+                <span class="font-semibold">Click to upload</span> or drag and drop
+              </p>
+              <p class="text-xs text-gray-400 dark:text-gray-400">SVG, PNG, JPG, or GIF (max 800×400px)</p>
+            </div>
+            <input id="dropzone-file" type="file" class="hidden" name="file" />
+          </label>
+
+          <!-- Upload Button -->
+          <button type="button" onclick="uploadFile()"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg shadow-md transition-all">
+            Upload File
+          </button>
+
+          <!-- Upload Status -->
+          <div id="uploadStatus" class="text-center hidden">
+            <p id="statusText" class="text-sm"></p>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="files mt-3 flex flex-col gap-2 w-90">
+      <% if (files && files.length > 0) { %>
+        <% files.forEach(file => { %>
+          <div class="p-2 rounded-md bg-gray-400 flex justify-between items-center">
+            <a href="<%= file.publicUrl %>" target="_blank" rel="noopener noreferrer" class="block text-white">
+              <strong><%= file.originalname || file.file_name || 'file' %></strong>
+            </a>
+            <div class="flex items-center gap-3">
+              <a href="/download/<%= file._id %>" 
+                class="text-blue-800 hover:text-blue-600"
+                download="<%= file.originalname || file.file_name || 'file' %>">
+                <i class="ri-arrow-down-line"></i>
+              </a>
+              <button onclick="deleteFile('<%= file._id %>')" 
+                class="text-red-600 hover:text-red-800">
+                <i class="ri-delete-bin-line"></i>
+              </button>
+            </div>
+          </div>
+        <% }) %>
+      <% } else { %>
+        <p class="text-gray-600">No files uploaded yet.</p>
+      <% } %>
+    </div>
+
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/flowbite@3.1.2/dist/flowbite.min.js"></script>
+
+  <script>
+    // Auto-refresh the page every 30 seconds to sync with bucket
+    setInterval(() => {
+      window.location.reload();
+    }, 30000);
+
+    function showPop() {
+      document.querySelector('.pop').classList.remove('hidden');
+    }
+
+    function hidePop() {
+      document.querySelector('.pop').classList.add('hidden');
+    }
+
+    async function deleteFile(fileId) {
+      if (!confirm('Are you sure you want to delete this file?')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/files/${fileId}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          // Reload the page to show updated file list
+          window.location.reload();
+        } else {
+          const data = await response.json();
+          alert('Failed to delete file: ' + (data.message || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('Delete error:', error);
+        alert('Failed to delete file. Please try again.');
+      }
+    }
+
+    async function uploadFile() {
+      const fileInput = document.getElementById('dropzone-file');
+      const statusDiv = document.getElementById('uploadStatus');
+      const statusText = document.getElementById('statusText');
+
+      if (!fileInput.files.length) {
+        alert('Please select a file first');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+
+      statusDiv.classList.remove('hidden');
+      statusText.textContent = 'Uploading...';
+      statusText.className = 'text-blue-600 dark:text-blue-400';
+
+      try {
+        const response = await fetch('/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || data.error) {
+          throw new Error(data.error || `HTTP error! status: ${response.status}`);
+        }
+
+        statusText.textContent = 'Upload successful!';
+        statusText.className = 'text-green-600 dark:text-green-400';
+
+        // Show uploaded file URL
+        const urlDisplay = document.createElement('a');
+        urlDisplay.href = data.file?.url || data.url;
+        urlDisplay.textContent = 'View uploaded file';
+        urlDisplay.className = 'block mt-2 text-blue-600 hover:underline';
+        urlDisplay.target = '_blank';
+        statusDiv.appendChild(urlDisplay);
+
+      } catch (error) {
+        console.error('Upload error:', error);
+        statusText.textContent = `Error: ${error.message}`;
+        statusText.className = 'text-red-600 dark:text-red-400';
+      }
+    }
+  </script>
+</body>
+</html>
